@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/icons/icon-192.png" alt="Logo de MoneyTrack: una M de tinta sobre una hoja blanca, subrayada en rojo, en una pared verde" width="88" height="88" />
+  <img src="docs/logo.png" alt="Logo de MoneyTrack: una M de tinta sobre una hoja blanca, subrayada en rojo, en una pared verde" width="88" height="88" />
 </p>
 
 <h1 align="center">MoneyTrack</h1>
@@ -14,13 +14,15 @@
   &nbsp;·&nbsp;
   <a href="#cómo-se-usa">Cómo se usa</a>
   &nbsp;·&nbsp;
-  <a href="#puesta-en-marcha-en-local">Instalar en local</a>
+  <a href="#arquitectura">Arquitectura</a>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/landing.png" alt="Portada de MoneyTrack: la hoja del mes colgada en una pared verde, con un calendario de gastos de ejemplo y una nota para apuntar el primer gasto" />
 </p>
 
+> Este repositorio es el escaparate del proyecto: producto, capturas y arquitectura. **El código fuente es privado** y está disponible bajo acuerdo de confidencialidad, a petición.
+>
 > Todas las capturas usan **datos de ejemplo**. Ninguna muestra cuentas reales.
 
 ---
@@ -34,7 +36,7 @@ La mayoría de apps de finanzas te piden mucho antes de darte algo: conectar el 
 - **Avisos antes, no después.** Un límite te avisa al 80 % (o al porcentaje que elijas) con los días que quedan, cuando todavía puedes cambiar algo.
 - **Tus datos, solo tuyos.** No hay conexión con el banco ni anuncios. Cada usuario solo puede leer lo suyo (Row Level Security en todas las tablas).
 
-El mundo visual se llama **«el calendario de la cocina»**: una pared verde, una hoja blanca, dos tintas (negra y rojo rotulador) y el verde solo para lo que entra. Está documentado en [DESIGN.md](DESIGN.md).
+El mundo visual se llama **«el calendario de la cocina»**: una pared verde, una hoja blanca, dos tintas (negra y rojo rotulador) y el verde solo para lo que entra.
 
 ---
 
@@ -131,10 +133,10 @@ Pequeñas reglas que se repiten en toda la app:
 
 - **Estados vacíos que enseñan.** Cada pantalla vacía dice qué aparecerá ahí y ofrece el primer paso, nunca un «No hay datos».
 - **Primer mes guiado.** Tres pasos con acciones reales (primer gasto, primer límite, primer recurrente) que desaparecen al completarse.
-- **Borrar siempre pide confirmación** en la propia hoja y explica qué se conserva («los movimientos no se tocan»). Nunca un `window.confirm`.
+- **Borrar siempre pide confirmación** en la propia hoja y explica qué se conserva («los movimientos no se tocan»).
 - **Errores que dicen qué hacer.** «No hay conexión. Comprueba tu red e inténtalo de nuevo», no un código.
 - **Todo se puede enlazar.** Filtros, mes y sección de ajustes viven en la URL.
-- **Accesible por teclado y lector de pantalla:** enlace para saltar al contenido, regiones `aria-live` para avisos, interruptores con `role="switch"`, contraste AA en claro y oscuro.
+- **Accesible por teclado y lector de pantalla:** enlace para saltar al contenido, avisos anunciados al lector, interruptores accesibles, contraste AA en claro y oscuro.
 - **Instalable (PWA).** Se añade a la pantalla de inicio del móvil y abre directamente en la app.
 
 ---
@@ -143,84 +145,27 @@ Pequeñas reglas que se repiten en toda la app:
 
 | Capa | Tecnología |
 |---|---|
-| Frontend (`frontend/`) | React 18, TypeScript estricto, Vite, CSS Modules sobre tokens, React Query, Zod |
-| Backend (`api/`) | Vercel Serverless Functions en TypeScript (Express en local) |
-| Datos y acceso | Supabase (PostgreSQL + Auth) con RLS en todas las tablas |
-| IA | Google Gemini con `responseSchema`, caché de 6 h por usuario e idioma y cupo diario |
-| Idiomas | `t('texto en español')` con diccionario inglés en `frontend/src/i18n/en.ts`; un test falla si falta una traducción |
+| Frontend | React 18, TypeScript estricto, Vite, CSS Modules sobre tokens de diseño, React Query, Zod |
+| Backend | Vercel Serverless Functions en TypeScript |
+| Datos y acceso | Supabase (PostgreSQL + Auth) con Row Level Security en todas las tablas |
+| IA | Google Gemini con salida estructurada, caché por usuario e idioma y cupo diario |
+| Idiomas | Español e inglés; los tests fallan si falta una traducción |
+| Calidad | TypeScript estricto en todo el proyecto y tests con Vitest |
 
-Movimientos y categorías pasan por `/api` (validación Zod en servidor). Viajes, objetivos, recurrentes e inversiones van directos a Supabase desde el cliente, protegidos por RLS y validados con Zod. Más detalle del diseño en [DESIGN.md](DESIGN.md) y del producto en [PRODUCT.md](PRODUCT.md).
+Las operaciones sensibles pasan por funciones serverless con validación en servidor. El resto va directo a Supabase desde el cliente, siempre protegido por RLS y validado con Zod. Las claves de servidor y de la IA nunca llegan al navegador.
 
 ---
 
-## Puesta en marcha en local
+## Código fuente
 
-### 1. Instalar dependencias
-
-```bash
-npm install
-cd frontend && npm install
-```
-
-### 2. Variables de entorno
-
-Raíz (`/.env`):
-
-```env
-SUPABASE_URL=...
-SUPABASE_ANON_KEY=...
-GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-3.5-flash-lite   # opcional
-AI_MAX_CALLS_PER_USER_PER_DAY=10     # opcional: llamadas reales a Gemini por usuario y endpoint cada 24 h
-AI_MAX_CALLS_PER_DAY=300             # opcional: techo global de llamadas a Gemini cada 24 h
-CRON_SECRET=...                      # obligatorio en Vercel para el cron keep-alive
-```
-
-`CRON_SECRET` es una cadena aleatoria larga. Vercel la envía al llamar al cron `/api/cron/keepalive` (una vez al día) y el endpoint rechaza cualquier llamada sin ella.
-
-`frontend/.env.local`:
-
-```env
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
-```
-
-### 3. Migraciones
-
-Ejecuta en orden, en el SQL Editor de Supabase, los archivos de `supabase/migrations/`:
-
-| Archivo | Qué crea |
-|---|---|
-| `001_initial_schema.sql` | perfiles, categorías (con semilla), movimientos |
-| `002_rls_policies.sql` | políticas RLS base |
-| `003_budgets.sql` | presupuestos mensuales |
-| `004_events.sql` | viajes y vínculo con movimientos |
-| `004_shopping_list.sql` | lista de la compra (módulo retirado de la interfaz; la tabla puede eliminarse) |
-| `005_rate_limiting.sql` | límite de peticiones a la IA |
-| `20260529_ai_cache.sql` | caché de la IA |
-| `006_savings_goals.sql` | objetivos de ahorro |
-| `007_recurring_transactions.sql` | recurrentes |
-| `008_budget_alert_threshold.sql` | umbral de aviso configurable en cada presupuesto |
-| `009_apply_recurring_rpc.sql` | función para apuntar un recurrente de forma atómica |
-| `010_investments.sql` | inversiones: aportaciones y valores anotados |
-
-**Recuperar contraseña:** en Supabase, *Authentication → URL Configuration*, añade a *Redirect URLs* `https://moneytrack.iagoestevez.com/restablecer` y `http://localhost:5173/restablecer`.
-
-### 4. Arrancar
-
-```bash
-npm run dev                  # API en http://localhost:3001
-cd frontend && npm run dev   # app en http://localhost:5173 (proxy /api → 3001)
-```
-
-Comprobaciones: `npm test` (Vitest) y `npm run typecheck` en la raíz y en `frontend/`.
+El código de MoneyTrack es privado. Si quieres revisarlo (por ejemplo, para una colaboración, una licencia o un proceso de selección), escríbeme y lo compartimos bajo acuerdo de confidencialidad.
 
 ---
 
 ## Autoría
 
-Diseñada y desarrollada por **[Iago Estévez](https://github.com/iagoesteevezz)**: producto, diseño y código.
-¿Algo no va bien? [Abre una incidencia](https://github.com/iagoesteevezz/moneytrack/issues).
+Diseñada y desarrollada por **[Iago Estévez Pérez](https://github.com/iagoesteevezz)**: producto, diseño y código.
+¿Algo no va bien en la app? Escríbeme a [iagoesteevezz@gmail.com](mailto:iagoesteevezz@gmail.com).
 
 ---
 
@@ -228,6 +173,6 @@ Diseñada y desarrollada por **[Iago Estévez](https://github.com/iagoesteevezz)
 
 © 2026 Iago Estévez Pérez. Todos los derechos reservados.
 
-MoneyTrack es software propietario: no se permite usarlo, copiarlo, modificarlo ni distribuirlo sin permiso escrito. Las condiciones completas están en [LICENSE](LICENSE), y las licencias de los componentes de terceros, en [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES).
+MoneyTrack es software propietario. Este repositorio, sus textos, capturas y logotipo no pueden usarse, copiarse, modificarse ni distribuirse sin permiso escrito. Las condiciones completas están en [LICENSE](LICENSE).
 
 Solicitudes de licencia: [iagoesteevezz@gmail.com](mailto:iagoesteevezz@gmail.com)
